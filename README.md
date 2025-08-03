@@ -1,2 +1,2 @@
 # Calendar4pc
-Calendar4pc is an app that displays two calendars.
+Calendar4pc is a calendar app with multiple lay-outs.
