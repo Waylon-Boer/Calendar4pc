@@ -1,196 +1,314 @@
-from tkinter import *
-from tkinter.ttk import Menubutton, Spinbox, Button, Entry, Style, Notebook
-from tkinter.messagebox import showinfo, showerror
-from tkinter import font
+import tkinter as tk
+from tkinter import ttk, filedialog, font
 import datetime, calendar
-import threading
-import time    
+import ctypes as ct
 
-def set_function(num):
-    for i in [button_previous, button_next, go_to_menubutton, calendarFrame, text, calendar2, timerFrame]:
-        i.grid_forget()
-    if num == 0:
-        main_menubutton.configure(text="Calendar")
-        button_previous.grid(row=0, column=1, sticky="nse")
-        button_next.grid(row=0, column=2, sticky="nse")
-        go_to_menubutton.grid(row=0, column=3, sticky="nse")
-        calendarFrame.grid(row=1, column=0, sticky="nsew")
-        text.grid(row=0, column=1, sticky="nsew")
-    elif num == 1:
-        main_menubutton.configure(text="Dual Calendar")
-        button_previous.grid(row=0, column=1, sticky="nse")
-        button_next.grid(row=0, column=2, sticky="nse")
-        go_to_menubutton.grid(row=0, column=3, sticky="nse")
-        calendarFrame.grid(row=1, column=0, sticky="nsew")
-        calendar2.grid(row=0, column=1, sticky="nsew")
-    elif num == 2:
-        main_menubutton.configure(text="Timer")
-        timerFrame.grid(row=1, column=0, sticky="nsew")
+class Calendar4pc:
+    def __init__(self):
+        self.weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        self.months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
-def get_calendars():
-    calendar1.delete(1.0, END)
-    calendar1.insert(1.0, calendar.month(y, m))
-    calendar2.delete(1.0, END)
-    if m == 12:
-        calendar2.insert(1.0, calendar.month(y + 1, 1))
-    else:
-        calendar2.insert(1.0, calendar.month(y, m + 1))
+        self.root = tk.Tk()
+        self.root.title("Calendar4pc")
+        self.root.geometry("580x285")
+        self.root.rowconfigure(1, weight=1)
+        self.root.columnconfigure(0, weight=1)
+        self.root.resizable(width=False, height=False)
+        self.root.minsize(width=290, height=285)
+        try:
+            self.root.iconbitmap("icon.ico")
+        except:
+            pass
 
-def previous_month():
-    global y, m
-    if m == 1:
-        y = y - 1
-        m = 12
-    else:
-        m = m - 1
-    get_calendars()
+        self.style = ttk.Style(self.root)
+        self.style.layout("Treeview", [("Event.Treeview.treearea", {"sticky": "nsew"})])
 
-def next_month():
-    global y, m
-    if m == 12:
-        y = y + 1
-        m = 1
-    else:
-        m = m + 1
-    get_calendars()
+        self.ics_events = []
+        self.ics_index = 0
 
-def now():
-    global y, m
-    y = datetime.datetime.now().year
-    m = datetime.datetime.now().month
-    get_calendars()
+        self.toolbar = tk.Frame(self.root, background="#F1F1F1")
+        self.toolbar.grid(row=0, column=0, sticky="nsew")
+        self.toolbar.columnconfigure(2, weight=1)
 
-def previous_year():
-    global y
-    y = y - 1
-    get_calendars()
+        self.button_previous_y = tk.Button(self.toolbar, width=5, text="Y-", command=self.previous_year)
+        self.button_previous_m = tk.Button(self.toolbar, width=5, text="M-", command=self.previous_month)
 
-def next_year():
-    global y
-    y = y + 1
-    get_calendars()
-    
-def set_timer(hours, minutes, seconds):
-    timer_spinbox_h.delete(0, END)
-    timer_spinbox_h.insert(0, hours)
-    timer_spinbox_m.delete(0, END)
-    timer_spinbox_m.insert(0, minutes)
-    timer_spinbox_s.delete(0, END)
-    timer_spinbox_s.insert(0, seconds)
+        self.main_menubutton = ttk.Menubutton(self.toolbar, text="Widgets")
+        self.main_menubutton.grid(row=0, column=2, sticky="ns", padx=5, pady=5)
+        self.function = tk.IntVar(value=0)
+        self.main_menu = tk.Menu(self.main_menubutton, tearoff=False, activeborderwidth=2.5)
+        self.main_menu.add_radiobutton(label="Calendar", variable=self.function, value=0, command=lambda: self.set_function(0))
+        self.main_menu.add_radiobutton(label="Dual Calendar", variable=self.function, value=1, command=lambda: self.set_function(1))
+        self.main_menu.add_radiobutton(label="Events", variable=self.function, value=2, command=lambda: self.set_function(2))
+        self.main_menu.add_separator()
+        self.main_menu.add_radiobutton(label="Clock", variable=self.function, value=3, command=lambda: self.set_function(3))
+        self.main_menubutton.configure(menu=self.main_menu)
 
-def start_timer():
-    if int(timer_spinbox_m.get()) > 59 or int(timer_spinbox_s.get()) > 59:
-        showerror("Timer", "Invalid input.")
-        if int(timer_spinbox_m.get()) > 59:
-            timer_spinbox_m.focus_set()
-            timer_spinbox_m.select_range(0, END)
+        self.button_next_m = tk.Button(self.toolbar, width=5, text="M+", command=self.next_month)
+        self.button_next_y = tk.Button(self.toolbar, width=5, text="Y+", command=self.next_year)
+
+        for button in [self.button_previous_y, self.button_previous_m, self.button_next_m, self.button_next_y]:
+            button.configure(bd=0)
+
+        self.calendarFrame = tk.Frame(self.root)
+        self.calendarFrame.grid(row=1, column=0, sticky="nsew")
+        self.calendarFrame.rowconfigure(0, weight=1)
+        self.calendarFrame.columnconfigure(0, weight=1)
+        self.calendarFrame.columnconfigure(1, weight=1)
+
+        self.y = datetime.datetime.now().year
+        self.m = datetime.datetime.now().month
+
+        self.calendar1 = tk.Text(self.calendarFrame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#ffffff", insertbackground="#ffffff")
+        self.calendar1.grid(row=0, column=0, sticky="nsew")
+        self.calendar1.tag_configure(tk.SEL, background="#ffffff", foreground="#000000")
+
+        self.calendar2 = tk.Text(self.calendarFrame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#e1e1e1", insertbackground="#e1e1e1")
+        self.calendar2.tag_configure(tk.SEL, background="#e1e1e1", foreground="#000000")
+
+        self.now()
+
+        self.clock = tk.Label(self.root, relief=tk.FLAT, font=("Segoe UI", 60), bg="#e1e1e1")
+
+        self.button_ics_1 = tk.Button(self.toolbar, bd=0, width=8, text="Open", command=self.open_ics)
+        self.button_ics_2 = tk.Button(self.toolbar, bd=0, width=8, text="Help", command=self.help_window)
+        self.button_ics_3 = tk.Button(self.toolbar, bd=0, width=8, text="<", command=self.previous_ics_event)
+        self.button_ics_4 = tk.Button(self.toolbar, bd=0, width=8, text=">", command=self.next_ics_event)
+
+        self.icsFrame = tk.Frame(self.root)
+        self.icsFrame.rowconfigure(1, weight=1)
+        self.icsFrame.columnconfigure(0, weight=1)
+
+        self.ics_label = tk.Label(self.icsFrame, bd=0, font=("Segoe UI", 12))
+        self.ics_label.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
+
+        self.ics_treeview = ttk.Treeview(self.icsFrame, columns=("key", "value"), show="")
+        self.ics_treeview.heading("key", text="Key")
+        self.ics_treeview.heading("value", text="Value")
+        self.ics_treeview.grid(row=1, column=0, sticky="nsew")
+
+        self.menu_B3 = tk.Menu(self.root, tearoff=False, activeborderwidth=2.5)
+        self.menu_B3.add_checkbutton(label="Pin Window", command=lambda: (self.root.attributes("-topmost", not self.root.attributes("-topmost")), self.root.overrideredirect(not self.root.overrideredirect()), self.restore_dark_mode()))
+        self.menu_B3.add_command(label="Switch Theme", command=self.switch_theme)
+        self.menu_B3.add_separator()
+        self.menu_B3.add_command(label="Help", command=self.help_window)
+
+        self.switch_theme()
+
+        self.root.bind("<Button-3>", lambda event: self.menu_B3.tk_popup(event.x_root, event.y_root))
+        self.root.bind("<Control-t>", lambda event: self.switch_theme())
+        self.root.bind("<Control-T>", lambda event: self.switch_theme())
+        self.root.bind("<F1>", lambda event: self.help_window())
+
+        self.set_function(0)
+        self.refresh()
+        self.root.mainloop()
+
+    def set_function(self, num):
+        for widget in [self.button_previous_y, self.button_previous_m, self.button_next_m, self.button_next_y, self.calendarFrame, self.calendar2, self.button_ics_1, self.button_ics_2, self.button_ics_3, self.button_ics_4, self.icsFrame, self.clock]:
+            widget.grid_forget()
+        self.root.unbind("<Control-Left>")
+        self.root.unbind("<Control-Right>")
+        self.root.unbind("<Alt-Left>")
+        self.root.unbind("<Alt-Right>")
+        if num == 0 or num == 1:
+            self.button_previous_y.grid(row=0, column=0, sticky="nsw")
+            self.button_previous_m.grid(row=0, column=1, sticky="nsw")
+            self.button_next_m.grid(row=0, column=3, sticky="nse")
+            self.button_next_y.grid(row=0, column=4, sticky="nse")
+            self.root.bind("<Control-Left>", lambda event: self.previous_year())
+            self.root.bind("<Control-Right>", lambda event: self.next_year())
+            self.root.bind("<Alt-Left>", lambda event: self.previous_month())
+            self.root.bind("<Alt-Right>", lambda event: self.next_month())
+        if num == 0:
+            self.root.geometry("290x285")
+            self.main_menubutton.configure(text="Calendar")
+            self.calendarFrame.grid(row=1, column=0, sticky="nsew")
+            self.calendarFrame.columnconfigure(1, weight=0)
+        elif num == 1:
+            self.root.geometry("580x285")
+            self.main_menubutton.configure(text="Dual Calendar")
+            self.calendarFrame.grid(row=1, column=0, sticky="nsew")
+            self.calendar2.grid(row=0, column=1, sticky="nsew")
+            self.calendarFrame.columnconfigure(1, weight=1)
+        elif num == 2:
+            self.root.geometry("580x400")
+            self.root.resizable(width=False, height=True)
+            self.main_menubutton.configure(text="Events")
+            self.button_ics_1.grid(row=0, column=0, sticky="nsw")
+            self.button_ics_2.grid(row=0, column=1, sticky="nsw")
+            self.button_ics_3.grid(row=0, column=3, sticky="nse")
+            self.button_ics_4.grid(row=0, column=4, sticky="nse")
+            self.icsFrame.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
+        elif num == 3:
+            self.root.geometry("435x285")
+            self.main_menubutton.configure(text="Clock")
+            self.clock.grid(row=1, column=0, sticky="nsew")
+        if num != 2:
+            self.root.resizable(width=False, height=False)
+        self.restore_dark_mode()
+
+    def get_calendars(self):
+        self.calendar1.configure(state=tk.NORMAL)
+        self.calendar1.delete(1.0, tk.END)
+        self.calendar1.insert(1.0, calendar.month(self.y, self.m))
+        self.calendar1.configure(state=tk.DISABLED)
+        self.calendar2.configure(state=tk.NORMAL)
+        self.calendar2.delete(1.0, tk.END)
+        if self.m == 12:
+            self.calendar2.insert(1.0, calendar.month(self.y + 1, 1))
         else:
-            timer_spinbox_s.focus_set()
-            timer_spinbox_s.select_range(0, END)
-    else:
-        timer_button_3.configure(text="Stop", command=stop_timer)
-        timerFrame.bind("<Return>", lambda event: stop_timer())
-        while 3600 * int(timer_spinbox_h.get()) + 60 * int(timer_spinbox_m.get()) + int(timer_spinbox_s.get()) > 0:
-            if int(timer_spinbox_s.get()) > 0:
-                time.sleep(1)
-                seconds = int(timer_spinbox_s.get())
-                timer_spinbox_s.delete(0, END)
-                timer_spinbox_s.insert(0, seconds - 1)
-            else:
-                if int(timer_spinbox_m.get()) > 0:
-                    minutes = int(timer_spinbox_m.get())
-                    timer_spinbox_m.delete(0, END)
-                    timer_spinbox_m.insert(0, minutes - 1)
-                    timer_spinbox_s.delete(0, END)
-                    timer_spinbox_s.insert(0, 59)
-                else:
-                    if int(timer_spinbox_h.get()) > 0:
-                        hours = int(timer_spinbox_h.get())
-                        timer_spinbox_h.delete(0, END)
-                        timer_spinbox_h.insert(0, hours - 1)
-                        timer_spinbox_m.delete(0, END)
-                        timer_spinbox_m.insert(0, 59)
-                        timer_spinbox_s.delete(0, END)
-                        timer_spinbox_s.insert(0, 59)
-        set_timer(0, 0, 0)
-        showinfo("Timer", "The timer is ready!")
+            self.calendar2.insert(1.0, calendar.month(self.y, self.m + 1))
+        self.calendar2.configure(state=tk.DISABLED)
 
-def stop_timer():
-    set_timer(0, 0, 0)
-    timer_button_3.configure(text="Start", command=lambda: threading.Thread(target=start_timer).start())
-    timerFrame.bind("<Return>", lambda event: threading.Thread(target=start_timer).start())
+    def previous_month(self):
+        if self.m == 1:
+            self.y -= 1
+            self.m = 12
+        else:
+            self.m -= 1
+        self.get_calendars()
 
-def refresh():
-    text.delete(1.0, END)
-    text.insert(INSERT, f"\n{datetime.datetime.now().strftime('%H:%M:%S')}\n")
-    text.insert(INSERT, f"{datetime.datetime.now().day} {months[datetime.datetime.now().month]} {datetime.datetime.now().year}\n\n")
-    text.insert(INSERT, f"Week {int(datetime.datetime.now().isocalendar().week)} - {weekdays[datetime.datetime.now().weekday()]}")
-    text.tag_add("large", 2.0, 3.0)
-    clock.delete(1.0, END)
-    clock.insert(INSERT, f"\n{datetime.datetime.now().strftime('%H:%M:%S')}\n")
-    clock.tag_add("centered", 1.0, END)
-    root.after(1, refresh)
+    def next_month(self):
+        if self.m == 12:
+            self.y += 1
+            self.m = 1
+        else:
+            self.m += 1
+        self.get_calendars()
 
-def change_theme():
-    if toolbar.cget("background") == "#f0f0f0":
-        calendar1.configure(bg="#1e1e1e", fg="#ffffff", insertbackground="#1e1e1e")
-        calendar1.tag_configure(SEL, background="#1e1e1e", foreground="#ffffff")
-        calendar2.configure(bg="#000000", fg="#ffffff", insertbackground="#000000")
-        calendar2.tag_configure(SEL, background="#000000", foreground="#ffffff")
-        text.configure(bg="#000000", fg="#ffffff", insertbackground="#000000")
-        text.tag_configure(SEL, background="#000000", foreground="#ffffff")
-        toolbar.configure(bg="#0f0f0f")
-        for i in [MainMenu, GoToMenu]:
-            i.configure(background="#0f0f0f", foreground="#ffffff", activebackground="#1e1e1e", activeforeground="#ffffff", selectcolor="#fff")
-        main_menubutton.configure(style="Dark.Toolbar.TMenubutton")
-        for i in [button_previous, button_next, go_to_menubutton]:
-            i.configure(style="Dark.Toolbar.TButton")
-        timerFrame.configure(background="#1e1e1e")
-        for i in [timer_label_h, timer_label_m, timer_label_s]:
-            i.configure(background="#1e1e1e", foreground="#ffffff")
-        for i in [timer_spinbox_h, timer_spinbox_m, timer_spinbox_s]:
-            i.configure(style="Dark.TSpinbox")
-        for i in [timer_button_1, timer_button_2, timer_button_3]:
-            i.configure(style="Dark.TButton")
-    else:
-        calendar1.configure(bg="#ffffff", fg="#000000", insertbackground="#ffffff")
-        calendar1.tag_configure(SEL, background="#ffffff", foreground="#000000")
-        calendar2.configure(bg="#e1e1e1", fg="#000000", insertbackground="#e1e1e1")
-        calendar2.tag_configure(SEL, background="#e1e1e1", foreground="#000000")
-        text.configure(bg="#e1e1e1", fg="#000000", insertbackground="#e1e1e1")
-        text.tag_configure(SEL, background="#e1e1e1", foreground="#000000")
-        toolbar.configure(bg="#f0f0f0")
-        for i in [MainMenu, GoToMenu]:
-            i.configure(background="#f0f0f0", foreground="#000000", activebackground="#e1e1e1", activeforeground="#000000", selectcolor="#000")
-        main_menubutton.configure(style="TMenubutton")
-        for i in [button_previous, button_next, go_to_menubutton]:
-            i.configure(style="TButton")
-        timerFrame.configure(background="#e1e1e1")
-        for i in [timer_label_h, timer_label_m, timer_label_s]:
-            i.configure(background="#e1e1e1", foreground="#000000")
-        for i in [timer_spinbox_h, timer_spinbox_m, timer_spinbox_s]:
-            i.configure(style="Light.TSpinbox")
-        for i in [timer_button_1, timer_button_2, timer_button_3]:
-            i.configure(style="Light.TButton")
+    def now(self):
+        self.y = datetime.datetime.now().year
+        self.m = datetime.datetime.now().month
+        self.get_calendars()
 
-def help_window():
-    window = Toplevel()
-    try:
-        window.iconbitmap("icon.ico")
-    except:
-        window.iconbitmap("")
-    window.title("Help - Calendar4pc")
-    window.geometry("700x510")
-    window.rowconfigure(0, weight=1)
-    window.columnconfigure(0, weight=1)
-    help_tabs = Notebook(window)
-    help_tabs.grid(row=0, column=0, sticky="nsew")
-    about = Text(help_tabs, relief=FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=WORD, background="#dcb")
-    about.insert(INSERT, f"Calendar4pc\nCopyright (c) 2025-{str(datetime.datetime.now().year)}: Waylon Boer\n\nCalendar4pc is a calendar app with multiple lay-outs.")
-    about.configure(state=DISABLED)
-    help_tabs.add(about, text="About")
-    mit_license = Text(help_tabs, relief=FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=WORD, background="#dcb")
-    mit_license.insert(INSERT, """MIT License
+    def previous_year(self):
+        self.y -= 1
+        self.get_calendars()
+
+    def next_year(self):
+        self.y += 1
+        self.get_calendars()
+
+    def refresh(self):
+        self.clock.configure(text=f"\n{datetime.datetime.now().strftime('%H:%M:%S')}\n")
+        self.root.after(200, self.refresh)
+
+    def restore_dark_mode(self):
+        if self.toolbar.cget("bg") == "#1C1C1C":
+            ct.windll.dwmapi.DwmSetWindowAttribute(ct.windll.user32.GetParent(self.root.winfo_id()), 20, ct.byref(ct.c_int(2)), ct.sizeof(ct.c_int(2)))
+
+    def switch_theme(self):
+        if self.toolbar.cget("background") == "#F0F0F0":
+            bg, bg2, bg3, bg4, bg5, bg6, fg = "#202020", "#1C1C1C", "#2B2B2B", "#3A3A3A", "#4D4D4D", "#5C5C5C", "#FFFFFF"
+            var = 2
+        else:
+            bg, bg2, bg3, bg4, bg5, bg6, fg = "#FFFFFF", "#F0F0F0", "#E1E1E1", "#F0F0F0", "#E1E1E1", "#D2D2D2", "#000000"
+            var = 0
+        ct.windll.dwmapi.DwmSetWindowAttribute(ct.windll.user32.GetParent(self.root.winfo_id()), 20, ct.byref(ct.c_int(var)), ct.sizeof(ct.c_int(var)))
+        self.root["background"] = bg
+        self.toolbar.configure(background=bg2)
+        self.style.configure("TMenubutton", background=bg2, foreground=fg)
+        self.style.configure("Treeview", background=bg, foreground=fg)
+        self.main_menu.configure(background=bg2, foreground=fg, selectcolor=fg,
+                                 activebackground=bg3, activeforeground=fg)
+        self.menu_B3.configure(background=bg2, foreground=fg, selectcolor=fg,
+                               activebackground=bg3, activeforeground=fg)
+        for widget in [self.icsFrame, self.clock]:
+            widget.configure(background=bg)
+        for widget in [self.ics_label, self.calendar1, self.clock]:
+            widget.configure(background=bg, foreground=fg)
+        self.calendar2.configure(background=bg3, foreground=fg)
+        self.calendar1.tag_configure(tk.SEL, background=bg, foreground=fg)
+        self.calendar2.tag_configure(tk.SEL, background=bg3, foreground=fg)
+        for widget in [self.button_previous_y, self.button_previous_m,
+                       self.button_next_m, self.button_next_y,
+                       self.button_ics_1, self.button_ics_2,
+                       self.button_ics_3, self.button_ics_4]:
+            widget.configure(background=bg2, foreground=fg,
+                             activebackground=bg6, activeforeground=fg)
+            widget.unbind("<Enter>")
+            widget.unbind("<Leave>")
+            widget.bind("<Enter>", lambda event, button=widget: button.configure(bg=bg3, fg=fg))
+            widget.bind("<Leave>", lambda event, button=widget: button.configure(bg=bg2, fg=fg))
+
+    def parse_ics(self, file_path):
+        events = []
+        event = {}
+        inside_event = False
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line == "BEGIN:VEVENT":
+                    inside_event = True
+                    event = {}
+                elif line == "END:VEVENT":
+                    inside_event = False
+                    events.append(event)
+                elif inside_event:
+                    if ":" not in line:
+                        continue
+                    key, value = line.split(":", 1)
+                    key = key.split(";")[0]
+                    if key in ("DTSTART", "DTEND"):
+                        try:
+                            if value.endswith("Z"):
+                                value = datetime.datetime.strptime(value, "%Y%m%dT%H%M%SZ")
+                            else:
+                                value = datetime.datetime.strptime(value, "%Y%m%dT%H%M%S")
+                        except:
+                            pass
+                    event[key] = value
+        return events
+
+    def fill_ics_treeview(self, event):
+        self.ics_treeview.delete(*self.ics_treeview.get_children())
+        for k, v in event.items():
+            self.ics_treeview.insert("", "end", values=(k, v))
+
+    def open_ics(self):
+        path = filedialog.askopenfilename(filetypes=[("iCalendar Files", "*.ics *.ical *.icalendar *.ifb"), ("vCalendar Files", "*.vcs")])
+        if not path:
+            return
+        self.ics_events = self.parse_ics(path)
+        self.ics_index = 0
+        if self.ics_events:
+            self.fill_ics_treeview(self.ics_events[self.ics_index])
+        self.ics_label.configure(text=f"Event {self.ics_index + 1}/{len(self.ics_events)}")
+
+    def previous_ics_event(self):
+        if not self.ics_events:
+            return
+        self.ics_index = max(0, self.ics_index - 1)
+        self.ics_label.configure(text=f"Event {self.ics_index + 1}/{len(self.ics_events)}")
+        self.fill_ics_treeview(self.ics_events[self.ics_index])
+
+    def next_ics_event(self):
+        if not self.ics_events:
+            return
+        self.ics_index = min(len(self.ics_events) - 1, self.ics_index + 1)
+        self.ics_label.configure(text=f"Event {self.ics_index + 1}/{len(self.ics_events)}")
+        self.fill_ics_treeview(self.ics_events[self.ics_index])
+
+    def help_window(self):
+        window = tk.Toplevel()
+        try:
+            window.iconbitmap("icon.ico")
+        except:
+            pass
+        window.title("Help - Calendar4pc")
+        window.geometry("700x510")
+        window.rowconfigure(0, weight=1)
+        window.columnconfigure(0, weight=1)
+        help_tabs = ttk.Notebook(window)
+        help_tabs.grid(row=0, column=0, sticky="nsew")
+        about = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#CCCCCC")
+        about.insert(tk.INSERT, f"Calendar4pc\nCopyright (c) 2025-{str(datetime.datetime.now().year)}: Waylon Boer\n\nCalendar4pc is a calendar app with multiple lay-outs.")
+        about.configure(state=tk.DISABLED)
+        help_tabs.add(about, text="About")
+        mit_license = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#CCCCCC")
+        mit_license.insert(tk.INSERT, """MIT License
 
 Copyright (c) 2025 Waylon Boer
 
@@ -211,116 +329,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.""")
-    mit_license.configure(state=DISABLED)
-    help_tabs.add(mit_license, text="License")
-    window.mainloop()
-    
-def pin():
-    root.attributes("-topmost", not root.attributes("-topmost"))
-    root.overrideredirect(not root.overrideredirect())
+        mit_license.configure(state=tk.DISABLED)
+        help_tabs.add(mit_license, text="License")
 
-
-weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-
-root = Tk()
-root.title("Calendar4pc")
-root.geometry("575x285")
-root.rowconfigure(1, weight=1)
-root.columnconfigure(0, weight=1)
-root.resizable(width=False, height=False)
-try:
-    root.iconbitmap("icon.ico")
-except:
-    root.iconbitmap("")
-
-Style().configure("Dark.Toolbar.TMenubutton", background="#0f0f0f", foreground="#ffffff")
-Style().configure("Dark.Toolbar.TButton", background="#0f0f0f")
-Style().configure("Light.TSpinbox", background="#e1e1e1")
-Style().configure("Light.TButton", background="#e1e1e1")
-Style().configure("Dark.TSpinbox", background="#1e1e1e")
-Style().configure("Dark.TButton", background="#1e1e1e")
-
-toolbar = Frame(root, border=4, background="#f0f0f0")
-toolbar.grid(row=0, column=0, sticky="nsew")
-toolbar.columnconfigure(1, weight=1)
-main_menubutton = Menubutton(toolbar, text="Widgets")
-main_menubutton.grid(row=0, column=0, sticky="nsw")
-function = IntVar(value=0)
-MainMenu = Menu(main_menubutton, tearoff=False, activeborderwidth=2.5, activebackground="#e1e1e1", activeforeground="#000000")
-MainMenu.add_radiobutton(label="Calendar", variable=function, value=0, command=lambda: set_function(0))
-MainMenu.add_radiobutton(label="Dual Calendar", variable=function, value=1, command=lambda: set_function(1))
-MainMenu.add_separator()
-MainMenu.add_radiobutton(label="Timer", variable=function, value=4, command=lambda: set_function(2))
-main_menubutton.configure(menu=MainMenu)
-button_previous = Button(toolbar, width=5, text="<", command=previous_month)
-button_previous.grid(row=0, column=1, sticky="nse")
-button_next = Button(toolbar, width=5, text=">", command=next_month)
-button_next.grid(row=0, column=2, sticky="nse")
-go_to_menubutton = Menubutton(toolbar, text="Go To", style="TButton", direction="left")
-go_to_menubutton.grid(row=0, column=3, sticky="nse", padx=(0, 2))
-GoToMenu = Menu(go_to_menubutton, tearoff=False, activeborderwidth=2.5, activebackground="#e1e1e1", activeforeground="#000000")
-GoToMenu.add_command(label="Today", command=now)
-GoToMenu.add_command(label="Previous Year", command=previous_year)
-GoToMenu.add_command(label="Next Year", command=next_year)
-GoToMenu.add_separator()
-GoToMenu.add_command(label="Help", command=help_window)
-go_to_menubutton.configure(menu=GoToMenu)
-
-calendarFrame = Frame(root)
-calendarFrame.grid(row=1, column=0, sticky="nsew")
-calendarFrame.rowconfigure(0, weight=1)
-calendarFrame.columnconfigure(0, weight=1)
-calendarFrame.columnconfigure(1, weight=1)
-y = datetime.datetime.now().year
-m = datetime.datetime.now().month
-calendar1 = Text(calendarFrame, width=1, bd=32, relief=FLAT, font=("Consolas", 15), bg="#ffffff", insertbackground="#ffffff")
-calendar1.grid(row=0, column=0, sticky="nsew")
-calendar1.tag_configure(SEL, background="#ffffff", foreground="#000000")
-calendar2 = Text(calendarFrame, width=1, bd=32, relief=FLAT, font=("Consolas", 15), bg="#e1e1e1", insertbackground="#e1e1e1")
-calendar2.tag_configure(SEL, background="#e1e1e1", foreground="#000000")
-text = Text(calendarFrame, width=1, bd=32, relief=FLAT, font=("tkDefaultFont", 16), bg="#e1e1e1", insertbackground="#e1e1e1")
-text.grid(row=0, column=1, sticky="nsew")
-text.tag_configure(SEL, background="#e1e1e1", foreground="#000000")
-text.tag_configure("large", font=("tkDefaultFont", 32))
-now()
-
-clock = Text(root, relief=FLAT, font=("tkDefaultFont", 52), bg="#e1e1e1", insertbackground="#e1e1e1")
-clock.tag_configure(SEL, background="#e1e1e1", foreground="#000000")
-clock.tag_configure("centered", justify='center')
-
-timerFrame = Frame(root, background="#e1e1e1")
-timerFrame.rowconfigure(2, weight=1)
-timerFrame.rowconfigure(3, weight=1)
-for i in range(0, 3):
-    timerFrame.columnconfigure(i, weight=1)
-timerFrame.configure(bd=16)
-timer_label_h = Label(timerFrame, text="Hours", background="#e1e1e1")
-timer_label_h.grid(row=0, column=0, sticky="w")
-timer_label_m = Label(timerFrame, text="Minutes", background="#e1e1e1")
-timer_label_m.grid(row=0, column=1, sticky="w")
-timer_label_s = Label(timerFrame, text="Seconds", background="#e1e1e1")
-timer_label_s.grid(row=0, column=2, sticky="w")
-timer_spinbox_h = Spinbox(timerFrame, values=list(range(0, 100)), style="Light.TSpinbox")
-timer_spinbox_h.grid(row=1, column=0, sticky="nsew", padx=(0, 1), pady=(0, 16))
-timer_spinbox_h.insert(0, 0)
-timer_spinbox_m = Spinbox(timerFrame, values=list(range(0, 60)), style="Light.TSpinbox")
-timer_spinbox_m.grid(row=1, column=1, sticky="nsew", padx=1, pady=(0, 16))
-timer_spinbox_m.insert(0, 0)
-timer_spinbox_s = Spinbox(timerFrame, values=list(range(0, 60)), style="Light.TSpinbox")
-timer_spinbox_s.grid(row=1, column=2, sticky="nsew", padx=(1, 0), pady=(0, 16))
-timer_spinbox_s.insert(0, 0)
-timer_button_1 = Button(timerFrame, text="5 min", command=lambda: set_timer(0, 5, 0), style="Light.TButton")
-timer_button_1.grid(row=2, column=0, sticky="nsew")
-timer_button_2 = Button(timerFrame, text="25 min", command=lambda: set_timer(0, 25, 0), style="Light.TButton")
-timer_button_2.grid(row=2, column=1, sticky="nsew")
-timer_button_3 = Button(timerFrame, text="Start", command=lambda: threading.Thread(target=start_timer).start(), style="Light.TButton")
-timer_button_3.grid(row=2, column=2, sticky="nsew")
-timerFrame.bind("<Return>", lambda event: threading.Thread(target=start_timer).start())
-
-set_function(0)
-refresh()
-root.bind("<F1>", lambda event: help_window())
-root.bind("<Double-Button-1>", lambda event: pin())
-root.bind("<Button-3>", lambda event: change_theme())
-root.mainloop()
+Calendar4pc()
