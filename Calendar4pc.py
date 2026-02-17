@@ -4,11 +4,13 @@ import datetime, calendar
 import ctypes as ct
 
 class Calendar4pc:
-    def __init__(self):
+    def __init__(self, root):
         self.weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         self.months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        self.date = datetime.datetime.now().date()
+        self.week = "Week " + str(int(datetime.datetime.now().isocalendar().week))
 
-        self.root = tk.Tk()
+        self.root = root
         self.root.title("Calendar4pc")
         self.root.geometry("580x285")
         self.root.rowconfigure(1, weight=1)
@@ -20,6 +22,7 @@ class Calendar4pc:
         except:
             pass
 
+        self.prefix = id(self.root)
         self.style = ttk.Style(self.root)
         self.style.layout("Treeview", [("Event.Treeview.treearea", {"sticky": "nsew"})])
 
@@ -33,7 +36,7 @@ class Calendar4pc:
         self.button_previous_y = tk.Button(self.toolbar, width=5, text="Y-", command=self.previous_year)
         self.button_previous_m = tk.Button(self.toolbar, width=5, text="M-", command=self.previous_month)
 
-        self.main_menubutton = ttk.Menubutton(self.toolbar, text="Widgets")
+        self.main_menubutton = ttk.Menubutton(self.toolbar, text="Widgets", style=f"{self.prefix}.TMenubutton")
         self.main_menubutton.grid(row=0, column=2, sticky="ns", padx=5, pady=5)
         self.function = tk.IntVar(value=0)
         self.main_menu = tk.Menu(self.main_menubutton, tearoff=False, activeborderwidth=2.5)
@@ -51,56 +54,58 @@ class Calendar4pc:
         for button in [self.button_previous_y, self.button_previous_m, self.button_next_m, self.button_next_y]:
             button.configure(bd=0)
 
-        self.calendarFrame = tk.Frame(self.root)
-        self.calendarFrame.grid(row=1, column=0, sticky="nsew")
-        self.calendarFrame.rowconfigure(0, weight=1)
-        self.calendarFrame.columnconfigure(0, weight=1)
-        self.calendarFrame.columnconfigure(1, weight=1)
+        self.calendar_frame = tk.Frame(self.root)
+        self.calendar_frame.grid(row=1, column=0, sticky="nsew")
+        self.calendar_frame.rowconfigure(0, weight=1)
+        self.calendar_frame.columnconfigure(0, weight=1)
+        self.calendar_frame.columnconfigure(1, weight=1)
 
         self.y = datetime.datetime.now().year
         self.m = datetime.datetime.now().month
 
-        self.calendar1 = tk.Text(self.calendarFrame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#ffffff", insertbackground="#ffffff")
+        self.calendar1 = tk.Text(self.calendar_frame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#FFFFFF", insertbackground="#FFFFFF")
         self.calendar1.grid(row=0, column=0, sticky="nsew")
-        self.calendar1.tag_configure(tk.SEL, background="#ffffff", foreground="#000000")
+        self.calendar1.tag_configure(tk.SEL, background="#FFFFFF", foreground="#000000")
 
-        self.calendar2 = tk.Text(self.calendarFrame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#e1e1e1", insertbackground="#e1e1e1")
-        self.calendar2.tag_configure(tk.SEL, background="#e1e1e1", foreground="#000000")
+        self.calendar2 = tk.Text(self.calendar_frame, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 15), bg="#E1E1E1", insertbackground="#E1E1E1")
+        self.calendar2.tag_configure(tk.SEL, background="#E1E1E1", foreground="#000000")
 
-        self.annual_calendar = tk.Text(self.root, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 12), bg="#ffffff", insertbackground="#ffffff")
-        self.annual_calendar.tag_configure(tk.SEL, background="#ffffff", foreground="#000000")
+        self.annual_calendar = tk.Text(self.root, width=1, bd=32, relief=tk.FLAT, font=("Consolas", 12), bg="#FFFFFF", insertbackground="#FFFFFF")
+        self.annual_calendar.tag_configure(tk.SEL, background="#FFFFFF", foreground="#000000")
 
         self.now()
 
-        self.label_today = tk.Label(self.toolbar, text=datetime.datetime.now().date(), width=20, anchor="w")
-        self.clock = tk.Label(self.root, relief=tk.FLAT, font=("Segoe UI", 60), bg="#e1e1e1")
-        self.label_week = tk.Label(self.toolbar, text="Week " + str(int(datetime.datetime.now().isocalendar().week)), width=20, anchor="e")
+        self.button_today = tk.Button(self.toolbar, text=self.date, command=lambda: self.button_today.configure(text=self.date if self.button_today.cget("text") == "" else ""), bd=0, relief=tk.FLAT, width=20, anchor="w")
+        self.clock = tk.Label(self.root, relief=tk.FLAT, font=("Segoe UI", 60), bg="#E1E1E1")
+        self.button_week = tk.Button(self.toolbar, text="", command=lambda: self.button_week.configure(text=self.week if self.button_week.cget("text") == "" else ""), bd=0, relief=tk.FLAT, width=20, anchor="e")
 
         self.button_ics_1 = tk.Button(self.toolbar, bd=0, width=8, text="Open", command=self.open_ics)
         self.button_ics_2 = tk.Button(self.toolbar, bd=0, width=8, text="Close", command=self.close_ics)
         self.button_ics_3 = tk.Button(self.toolbar, bd=0, width=8, text="<<", command=self.previous_ics_event)
         self.button_ics_4 = tk.Button(self.toolbar, bd=0, width=8, text=">>", command=self.next_ics_event)
 
-        self.icsFrame = tk.Frame(self.root)
-        self.icsFrame.rowconfigure(1, weight=1)
-        self.icsFrame.columnconfigure(0, weight=1)
+        self.ics_frame = tk.Frame(self.root)
+        self.ics_frame.rowconfigure(1, weight=1)
+        self.ics_frame.columnconfigure(0, weight=1)
 
-        self.ics_label = tk.Label(self.icsFrame, bd=0, font=("Segoe UI", 12))
+        self.ics_label = tk.Label(self.ics_frame, bd=0, font=("Segoe UI", 12))
         self.ics_label.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
-        self.ics_treeview = ttk.Treeview(self.icsFrame, columns=("key", "value"), show="")
+        self.ics_treeview = ttk.Treeview(self.ics_frame, columns=("key", "value"), show="", style=f"{self.prefix}.Treeview")
         self.ics_treeview.grid(row=1, column=0, sticky="nsew")
 
-        self.menu_B3 = tk.Menu(self.root, tearoff=False, activeborderwidth=2.5)
-        self.menu_B3.add_checkbutton(label="Pin Window", command=lambda: (self.root.attributes("-topmost", not self.root.attributes("-topmost")), self.root.overrideredirect(not self.root.overrideredirect()), self.restore_dark_mode()))
-        self.menu_B3.add_command(label="Switch Theme", command=self.switch_theme)
-        self.menu_B3.add_separator()
-        self.menu_B3.add_command(label="Today", command=lambda: (self.now(), self.go_to_calendar()))
-        self.menu_B3.add_command(label="Help", command=self.help_window)
+        self.context_menu = tk.Menu(self.root, tearoff=False, activeborderwidth=2.5)
+        self.context_menu.add_checkbutton(label="Pin Window", command=lambda: (self.root.attributes("-topmost", not self.root.attributes("-topmost")), self.root.overrideredirect(not self.root.overrideredirect()), self.restore_dark_mode()))
+        self.context_menu.add_command(label="Switch Theme", command=self.switch_theme)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="New Window", command=self.open_new_window)
+        self.context_menu.add_command(label="Help", command=self.help_window)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Today", command=lambda: (self.now(), self.go_to_calendar()))
 
         self.switch_theme()
 
-        self.root.bind("<Button-3>", lambda event: self.menu_B3.tk_popup(event.x_root, event.y_root))
+        self.root.bind("<Button-3>", lambda event: self.context_menu.tk_popup(event.x_root, event.y_root))
         self.root.bind("<Control-t>", lambda event: self.switch_theme())
         self.root.bind("<Control-T>", lambda event: self.switch_theme())
         self.root.bind("<F1>", lambda event: self.help_window())
@@ -110,7 +115,7 @@ class Calendar4pc:
         self.root.mainloop()
 
     def set_function(self, num):
-        for widget in [self.button_previous_y, self.button_previous_m, self.button_next_m, self.button_next_y, self.calendarFrame, self.calendar2, self.annual_calendar, self.button_ics_1, self.button_ics_2, self.button_ics_3, self.button_ics_4, self.icsFrame, self.label_today, self.label_week, self.clock]:
+        for widget in [self.button_previous_y, self.button_previous_m, self.button_next_m, self.button_next_y, self.calendar_frame, self.calendar2, self.annual_calendar, self.button_ics_1, self.button_ics_2, self.button_ics_3, self.button_ics_4, self.ics_frame, self.button_today, self.button_week, self.clock]:
             widget.grid_forget()
         self.root.unbind("<Control-Left>")
         self.root.unbind("<Control-Right>")
@@ -130,14 +135,14 @@ class Calendar4pc:
         if num == 0:
             self.root.geometry("290x285")
             self.main_menubutton.configure(text="Calendar")
-            self.calendarFrame.grid(row=1, column=0, sticky="nsew")
-            self.calendarFrame.columnconfigure(1, weight=0)
+            self.calendar_frame.grid(row=1, column=0, sticky="nsew")
+            self.calendar_frame.columnconfigure(1, weight=0)
         elif num == 1:
             self.root.geometry("580x285")
             self.main_menubutton.configure(text="Dual Calendar")
-            self.calendarFrame.grid(row=1, column=0, sticky="nsew")
+            self.calendar_frame.grid(row=1, column=0, sticky="nsew")
             self.calendar2.grid(row=0, column=1, sticky="nsew")
-            self.calendarFrame.columnconfigure(1, weight=1)
+            self.calendar_frame.columnconfigure(1, weight=1)
         elif num == 2:
             self.root.geometry("716x800")
             self.button_previous_y.configure(width=8)
@@ -156,11 +161,11 @@ class Calendar4pc:
             self.button_ics_2.grid(row=0, column=1, sticky="nsw")
             self.button_ics_3.grid(row=0, column=3, sticky="nse")
             self.button_ics_4.grid(row=0, column=4, sticky="nse")
-            self.icsFrame.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
+            self.ics_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
         elif num == 4:
             self.root.geometry("435x285")
-            self.label_today.grid(row=0, column=0, sticky="nsw", padx=(10, 0))
-            self.label_week.grid(row=0, column=4, sticky="nse", padx=(0, 10))
+            self.button_today.grid(row=0, column=0, sticky="nsw", padx=(10, 0))
+            self.button_week.grid(row=0, column=4, sticky="nse", padx=(0, 10))
             self.main_menubutton.configure(text="Clock")
             self.clock.grid(row=1, column=0, sticky="nsew")
         if num != 3:
@@ -170,18 +175,18 @@ class Calendar4pc:
     def get_calendars(self):
         self.calendar1.configure(state=tk.NORMAL)
         self.calendar1.delete(1.0, tk.END)
-        self.calendar1.insert(1.0, calendar.month(self.y, self.m))
+        self.calendar1.insert(1.0, calendar.month(self.y, self.m).rstrip("\n"))
         self.calendar1.configure(state=tk.DISABLED)
         self.calendar2.configure(state=tk.NORMAL)
         self.calendar2.delete(1.0, tk.END)
         if self.m == 12:
-            self.calendar2.insert(1.0, calendar.month(self.y + 1, 1))
+            self.calendar2.insert(1.0, calendar.month(self.y + 1, 1).rstrip("\n"))
         else:
-            self.calendar2.insert(1.0, calendar.month(self.y, self.m + 1))
+            self.calendar2.insert(1.0, calendar.month(self.y, self.m + 1).rstrip("\n"))
         self.calendar2.configure(state=tk.DISABLED)
         self.annual_calendar.configure(state=tk.NORMAL)
         self.annual_calendar.delete(1.0, tk.END)
-        self.annual_calendar.insert(1.0, calendar.calendar(self.y))
+        self.annual_calendar.insert(1.0, calendar.calendar(self.y).rstrip("\n"))
         self.annual_calendar.configure(state=tk.DISABLED)
 
     def previous_month(self):
@@ -242,13 +247,13 @@ class Calendar4pc:
             return
         self.root["background"] = bg
         self.toolbar.configure(background=bg2)
-        for widget in [self.label_today, self.label_week]:
+        for widget in [self.button_today, self.button_week]:
             widget.configure(background=bg2, foreground=fg)
-        self.style.configure("TMenubutton", background=bg2, foreground=fg)
-        self.style.configure("Treeview", background=bg, foreground=fg)
+        self.style.configure(f"{self.prefix}.TMenubutton", background=bg2, foreground=fg)
+        self.style.configure(f"{self.prefix}.Treeview", background=bg, foreground=fg)
         self.main_menu.configure(background=bg2, foreground=fg, selectcolor=fg, activebackground=bg3, activeforeground=fg)
-        self.menu_B3.configure(background=bg2, foreground=fg, selectcolor=fg, activebackground=bg3, activeforeground=fg)
-        for widget in [self.icsFrame, self.clock]:
+        self.context_menu.configure(background=bg2, foreground=fg, selectcolor=fg, activebackground=bg3, activeforeground=fg)
+        for widget in [self.ics_frame, self.clock]:
             widget.configure(background=bg)
         for widget in [self.ics_label, self.calendar1, self.annual_calendar, self.clock]:
             widget.configure(background=bg, foreground=fg)
@@ -338,11 +343,11 @@ class Calendar4pc:
         window.columnconfigure(0, weight=1)
         help_tabs = ttk.Notebook(window)
         help_tabs.grid(row=0, column=0, sticky="nsew")
-        about = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#CCCCCC")
+        about = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#E1E1E1")
         about.insert(tk.INSERT, f"Calendar4pc\nCopyright (c) 2025-{str(datetime.datetime.now().year)}: Waylon Boer\n\nCalendar4pc is a calendar app with multiple lay-outs.")
         about.configure(state=tk.DISABLED)
         help_tabs.add(about, text="About")
-        mit_license = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#CCCCCC")
+        mit_license = tk.Text(help_tabs, relief=tk.FLAT, border=16, font=(font.nametofont("TkDefaultFont").actual()["family"], 12), wrap=tk.WORD, background="#E1E1E1")
         mit_license.insert(tk.INSERT, """MIT License
 
 Copyright (c) 2025 Waylon Boer
@@ -367,4 +372,11 @@ SOFTWARE.""")
         mit_license.configure(state=tk.DISABLED)
         help_tabs.add(mit_license, text="License")
 
-Calendar4pc()
+    def open_new_window(self):
+        new = tk.Toplevel(self.root)
+        Calendar4pc(new)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    Calendar4pc(root)
+    root.mainloop()
